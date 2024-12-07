@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AQI Map of Indian Cities</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      height: 200vh;
+    }
+    #prediction {
+            width: 35%;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            background-color: #f9f9f9;
+        }
+
+        #prediction h2 {
+            margin-bottom: 20px;
+        }
+
+        #prediction form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #prediction label {
+            margin-bottom: 10px;
+        }
+
+        #prediction button {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #prediction button:hover {
+            background-color: #45a049;
+        }
+
+        #result {
+            font-weight: bold;
+            color: #333;
+        }
+    .weather-icon {
+      font-size: 70px;
+      vertical-align: middle;
+    }
+    .popup-content {
+      font-size: 14px;
+      max-width: 300px;
+      line-height: 1.6;
+    }
+    .leaflet-control-attribution {
+      display: none;
+    }
+    .legend {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgb(160, 231, 231);
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 8);
+      font-family: Arial, sans-serif;
+      z-index: 1000; /* Ensure it appears above the map */
+    }
+    .legend div {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    .legend div span {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+ <!-- Left side: Map Section -->
+ <div id="map">
+    <!-- Map will be here -->
+    <h3>Map of the Area (Replace with your actual map)</h3>
+</div>
+
+<!-- Right side: AQI Prediction Form -->
+<div id="prediction">
+    <h2>AQI Prediction</h2>
+    <form id="inputForm">
+        <label>PM2.5: <input type="number" id="pm25"></label><br>
+        <label>PM10: <input type="number" id="pm10"></label><br>
+        <label>NO2: <input type="number" id="no2"></label><br>
+        <label>SO2: <input type="number" id="so2"></label><br>
+        <label>CO: <input type="number" id="co"></label><br>
+        <label>O3: <input type="number" id="o3"></label><br>
+        <label>Temperature: <input type="number" id="temperature"></label><br>
+        <label>Humidity: <input type="number" id="humidity"></label><br>
+        <label>Wind Speed: <input type="number" id="windspeed"></label><br>
+        <button type="button" onclick="predictAQI()">Predict AQI</button>
+    </form>
+    <h3>Predicted AQI: <span id="result">N/A</span></h3>
+</div>
+  <div class="legend">
+    <div><span style="background: blue;"></span>Good</div>
+    <div><span style="background: green;"></span>Fair</div>
+    <div><span style="background: orange;"></span>Moderate</div>
+    <div><span style="background: purple;"></span>Poor</div>
+    <div><span style="background: red;"></span>Very Poor</div>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const apiKey = "80d328c90bf3c98f75e7eb3ac38af04b"; // Replace with your OpenWeatherMap API key
+    const cities = [
+      { name: "Andhra Pradesh", lat: 15.9129, lon: 79.7400 },
+      { name: "Arunachal Pradesh", lat: 28.2180, lon: 94.7278 },
+      { name: "Assam", lat: 26.2006, lon: 92.9376 },
+      { name: "Bihar", lat: 25.0961, lon: 85.3131 },
+      { name: "Chhattisgarh", lat: 21.2787, lon: 81.8661 },
+      { name: "Goa", lat: 15.2993, lon: 74.1240 },
+      { name: "Gujarat", lat: 22.2587, lon: 71.1924 },
+      { name: "Haryana", lat: 29.0588, lon: 76.0856 },
+      { name: "Himachal Pradesh", lat: 31.1048, lon: 77.1734 },
+      { name: "Jharkhand", lat: 23.6102, lon: 85.2799 },
+      { name: "Karnataka", lat: 15.3173, lon: 75.7139 },
+      { name: "Kerala", lat: 10.8505, lon: 76.2711 },
+      { name: "Madhya Pradesh", lat: 22.9734, lon: 78.6569 },
+      { name: "Maharashtra", lat: 19.7515, lon: 75.7139 },
+      { name: "Manipur", lat: 24.6637, lon: 93.9063 },
+      { name: "Meghalaya", lat: 25.4670, lon: 91.3662 },
+      { name: "Mizoram", lat: 23.1645, lon: 92.9376 },
+      { name: "Nagaland", lat: 26.1584, lon: 94.5624 },
+      { name: "Odisha", lat: 20.9517, lon: 85.0985 },
+      { name: "Punjab", lat: 31.1471, lon: 75.3412 },
+      { name: "Rajasthan", lat: 27.0238, lon: 74.2179 },
+      { name: "Sikkim", lat: 27.5330, lon: 88.5122 },
+      { name: "Tamil Nadu", lat: 11.1271, lon: 78.6569 },
+      { name: "Telangana", lat: 18.1124, lon: 79.0193 },
+      { name: "Tripura", lat: 23.9408, lon: 91.9882 },
+      { name: "Uttar Pradesh", lat: 26.8467, lon: 80.9462 },
+      { name: "Uttarakhand", lat: 30.0668, lon: 79.0193 },
+      { name: "West Bengal", lat: 22.9868, lon: 87.8550 },
+      { name: "Andaman and Nicobar Islands", lat: 11.7401, lon: 92.6586 },
+      { name: "Chandigarh", lat: 30.7333, lon: 76.7794 },
+      { name: "Dadra and Nagar Haveli and Daman and Diu", lat: 20.3974, lon: 72.8328 },
+      { name: "Delhi", lat: 28.7041, lon: 77.1025 },
+      { name: "Jammu and Kashmir", lat: 33.7782, lon: 76.5762 },
+      { name: "Ladakh", lat: 34.2268, lon: 77.5619 },
+      { name: "Lakshadweep", lat: 10.5667, lon: 72.6417 },
+      { name: "Puducherry", lat: 11.9416, lon: 79.8083 },
+      { country: "Afghanistan", state: "Kabul", capital: "Kabul", lat: 34.5320, lon: 69.1658 },
+     { country: "Albania", state: "Tirana", capital: "Tirana", lat: 41.3275, lon: 19.8189 },
+     { country: "Algeria", state: "Algiers", capital: "Algiers", lat: 36.7528, lon: 3.0420 },
+    { country: "Andorra", state: "Andorra la Vella", capital: "Andorra la Vella", lat: 42.5078, lon: 1.5211 },
+    { country: "Angola", state: "Luanda", capital: "Luanda", lat: -8.8390, lon: 13.2894 },
+    { country: "Antigua and Barbuda", state: "St. John's", capital: "St. John's", lat: 17.1186, lon: -61.8468 },
+    { country: "Argentina", state: "Buenos Aires", capital: "Buenos Aires", lat: -34.6037, lon: -58.3816 },
+    { country: "Armenia", state: "Yerevan", capital: "Yerevan", lat: 40.1792, lon: 44.4991 },
+    { country: "Australia", state: "Canberra", capital: "Canberra", lat: -35.2809, lon: 149.1300 },
+    { country: "Austria", state: "Vienna", capital: "Vienna", lat: 48.2082, lon: 16.3738 },
+    { country: "Azerbaijan", state: "Baku", capital: "Baku", lat: 40.4093, lon: 49.8671 },
+    { country: "Bahamas", state: "Nassau", capital: "Nassau", lat: 25.0343, lon: -77.3963 },
+    { country: "Bahrain", state: "Manama", capital: "Manama", lat: 26.2235, lon: 50.5876 },
+    { country: "Bangladesh", state: "Dhaka", capital: "Dhaka", lat: 23.8103, lon: 90.4125 },
+    { country: "Barbados", state: "Bridgetown", capital: "Bridgetown", lat: 13.1, lon: -59.6167 },
+    { country: "Belarus", state: "Minsk", capital: "Minsk", lat: 53.9, lon: 27.5667 },
+    { country: "Belgium", state: "Brussels", capital: "Brussels", lat: 50.8503, lon: 4.3517 },
+    { country: "Belize", state: "Belmopan", capital: "Belmopan", lat: 17.25, lon: -88.7667 },
+    { country: "Benin", state: "Porto-Novo", capital: "Porto-Novo", lat: 6.4969, lon: 2.6281 },
+    { country: "Bhutan", state: "Thimphu", capital: "Thimphu", lat: 27.4713, lon: 89.6339 },
+    { country: "Bolivia", state: "Sucre", capital: "Sucre", lat: -19.0333, lon: -65.2628 },
+    { country: "Bosnia and Herzegovina", state: "Sarajevo", capital: "Sarajevo", lat: 43.8486, lon: 18.3564 },
+    { country: "Botswana", state: "Gaborone", capital: "Gaborone", lat: -24.6282, lon: 25.9231 },
+    { name: "Brazil", state: "Brasília", capital: "Brasília", lat: -15.7801, lon: -47.9292 },
+    { name: "Great Wall of China", lat: 40.4319, lon: 116.5704, },
+    { name: "Taj Mahal", lat: 27.1751, lon: 78.0421, },
+    { name: "Mount Everest", lat: 27.9881, lon: 86.9250, },
+    { name: "Petra", lat: 30.3285, lon: 35.4444, },
+    { name: "Angkor Wat", lat: 13.4125, lon: 103.8670, },
+    { name: "Burj Khalifa", lat: 25.1972, lon: 55.2744, },
+    { name: "Eiffel Tower", lat: 48.8584, lon: 2.2945, },
+    { name: "Colosseum", lat: 41.8902, lon: 12.4922, },
+    { name: "Statue of Liberty", lat: 40.6892, lon: -74.0445, },
+    { name: "Machu Picchu", lat: -13.1631, lon: -72.5450, },
+    { name: "Christ the Redeemer", lat: -22.9519, lon: -43.2105, },
+    { name: "Sydney Opera House", lat: -33.8568, lon: 151.2153, },
+    { name: "Golden Gate Bridge", lat: 37.8199, lon: -122.4783, },
+    { name: "Pyramids of Giza", lat: 29.9792, lon: 31.1342, },
+    { name: "Big Ben", lat: 51.5007, lon: -0.1246, },
+    { name: "Acropolis of Athens", lat: 37.9715, lon: 23.7257, },
+    { name: "Brandenburg Gate", lat: 52.5163, lon: 13.3777, },
+    { name: "Sagrada Familia", lat: 41.4036, lon: 2.1744, },
+    { name: "Chichen Itza", lat: 20.6843, lon: -88.5678, },
+    { name: "Great Barrier Reef", lat: -18.2861, lon: 147.7000, },
+    { name: "Grand Canyon", lat: 36.1069, lon: -112.1129, },
+    { name: "Niagara Falls", lat: 43.0962, lon: -79.0377, },
+    { name: "Tokyo Tower", lat: 35.6586, lon: 139.7454, },
+    { name: "Stonehenge", lat: 51.1789, lon: -1.8262, },
+    { name: "Neuschwanstein Castle", lat: 47.5576, lon: 10.7498, },
+    { name: "Victoria Falls", lat: -17.9243, lon: 25.8565, },
+    { name: "Alhambra", lat: 37.1761, lon: -3.5881, },
+    { name: "Jeju Island", lat: 33.4996, lon: 126.5312, },
+    { name: "Mount Fuji", lat: 35.3606, lon: 138.7274, },
+    { name: "Yellowstone National Park", lat: 44.4280, lon: -110.5885, },
+    { name: "Banff National Park", lat: 51.4968, lon: -115.9281, },
+    { name: "Santorini", lat: 36.3932, lon: 25.4615, },
+    { name: "Venice Canals", lat: 45.4408, lon: 12.3155, },
+    { name: "Times Square", lat: 40.7580, lon: -73.9855, },
+    { name: "Dubai Marina", lat: 25.0808, lon: 55.1403, },
+    { name: "Burj Al Arab", lat: 25.1412, lon: 55.1853, },
+    { name: "Singapore Marina Bay Sands", lat: 1.2834, lon: 103.8607, },
+    { name: "Himalayas Annapurna Circuit", lat: 28.5983, lon: 84.0918, },
+    { name: "Antelope Canyon", lat: 36.8619, lon: -111.3743, },
+    { name: "Blue Lagoon Iceland", lat: 63.8804, lon: -22.4495, },
+    { name: "Maldives Islands", lat: 3.2028, lon: 73.2207, },
+    { name: "Lake Baikal", lat: 53.5587, lon: 108.1650, },
+    { name: "Galapagos Islands", lat: -0.8293, lon: -90.9821, },
+    { name: "Uluru", lat: -25.3444, lon: 131.0369, },
+    { name: "Mount Kilimanjaro", lat: -3.0674, lon: 37.3556, },
+    { name: "Serengeti National Park", lat: -2.3333, lon: 34.8333, },
+    { name: "Iguazu Falls", lat: -25.6953, lon: -54.4367, },
+    { name: "Cappadocia", lat: 38.6431, lon: 34.8306, },
+    { name: "Athabasca Glacier", lat: 52.2207, lon: -117.2245, }, 
+    { name: "Shwedagon Pagoda", lat: 16.8661, lon: 96.1950 },
+    { name: "Bagan", lat: 21.1681, lon: 94.9300 },
+    { name: "Inle Lake", lat: 20.5333, lon: 96.9240 },
+    { name: "Mount Kyaiktiyo (Golden Rock)", lat: 17.4597, lon: 97.7319 },
+    { name: "U Bein Bridge", lat: 21.9131, lon: 96.0502 },
+
+    // China
+    { name: "Great Wall of China", lat: 40.4319, lon: 116.5704 },
+    { name: "Forbidden City", lat: 39.9163, lon: 116.3972 },
+    { name: "Terracotta Army", lat: 34.3853, lon: 109.2787 },
+    { name: "Mount Everest", lat: 27.9881, lon: 86.9250 },
+    { name: "Li River", lat: 25.2425, lon: 110.3050 },
+    { name: "Potala Palace", lat: 29.6575, lon: 91.1162 },
+    { name: "Summer Palace", lat: 39.9996, lon: 116.2751 },
+
+    // Japan
+    { name: "Mount Fuji", lat: 35.3606, lon: 138.7274 },
+    { name: "Tokyo Tower", lat: 35.6586, lon: 139.7454 },
+    { name: "Kinkaku-ji (Golden Pavilion)", lat: 35.0394, lon: 135.7292 },
+    { name: "Fushimi Inari Taisha", lat: 35.0377, lon: 135.7787 },
+    { name: "Kyoto Imperial Palace", lat: 35.0274, lon: 135.7793 },
+    { name: "Himeji Castle", lat: 34.8394, lon: 134.6939 },
+    { name: "Itsukushima Shrine", lat: 34.2950, lon: 132.3195 },
+
+    // Russia
+    { name: "Red Square", lat: 55.7558, lon: 37.6173 },
+    { name: "Saint Basil's Cathedral", lat: 55.7557, lon: 37.6176 },
+    { name: "Kremlin", lat: 55.7520, lon: 37.6178 },
+    { name: "Lake Baikal", lat: 53.5587, lon: 108.1650 },
+    { name: "Hermitage Museum", lat: 59.9398, lon: 30.3146 },
+    { name: "Mount Elbrus", lat: 43.3499, lon: 42.4456 },
+    { name: "Catherine Palace", lat: 59.7264, lon: 30.3856 },
+    { name: "Kizhi Island", lat: 61.5176, lon: 37.3407 }
+    // More countri
+    ];
+
+    const map = L.map("map").setView([22.3511, 78.6677], 5); // Center on India
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Function to get AQI category, precautions, and color
+    function getAQICategory(aqi) {
+      if (aqi === 1) {
+        return {
+          category: "Good",
+          color: "blue",
+          precautions: "Air quality is considered satisfactory. Enjoy the clean air!",
+          fix: "No action needed. Keep up the clean air!"
+        };
+      }
+      if (aqi === 2) {
+        return {
+          category: "Fair",
+          color: "green",
+          precautions: "Air quality is acceptable; however, some pollution may pose a risk for sensitive individuals.",
+          fix: "Sensitive groups may consider reducing outdoor activities."
+        };
+      }
+      if (aqi === 3) {
+        return {
+          category: "Moderate",
+          color: "orange",
+          precautions: "Air quality is acceptable, but pollutants may affect sensitive individuals.",
+          fix: "Sensitive individuals should limit outdoor activities."
+        };
+      }
+      if (aqi === 4) {
+        return {
+          category: "Poor",
+          color: "purple",
+          precautions: "Health alert: Everyone may begin to experience health effects.",
+          fix: "Avoid outdoor activities, especially for sensitive groups."
+        };
+      }
+      if (aqi === 5) {
+        return {
+          category: "Very Poor",
+          color: "red",
+          precautions: "Health warning of emergency conditions; the entire population may be affected.",
+          fix: "Stay indoors, avoid strenuous outdoor activities, and wear a mask."
+        };
+      }
+      return {
+        category: "Unknown",
+        color: "gray",
+        precautions: "AQI data is unavailable.",
+        fix: "No data available to suggest fixes."
+      };
+    }
+
+    // Function to get weather icon based on weather description
+    function getWeatherIcon(description) {
+      if (description.includes("rain")) return "🌧️";
+      if (description.includes("clear")) return "☀️";
+      if (description.includes("cloud")) return "☁️";
+      if (description.includes("snow")) return "❄️";
+      return "💨";
+    }
+
+    // Fetch AQI data and weather data, and add markers
+    async function fetchAQIData() {
+      for (const city of cities) {
+        try {
+          const [aqiResponse, weatherResponse] = await Promise.all([ 
+            fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${city.lat}&lon=${city.lon}&appid=${apiKey}`),
+            fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${city.lat}&lon=${city.lon}&appid=${apiKey}&units=metric`)
+          ]);
+
+          const aqiData = await aqiResponse.json();
+          const weatherData = await weatherResponse.json();
+
+          const aqi = aqiData.list[0].main.aqi;
+          const temperature = weatherData.main.temp;
+          const weatherDesc = weatherData.weather[0].description;
+
+          const { category, color, precautions, fix } = getAQICategory(aqi);
+          const weatherIcon = getWeatherIcon(weatherDesc);
+          const timestamp = new Date().toLocaleString(); // Get the current timestamp
+
+          // Add marker to the map
+          const marker = L.circleMarker([city.lat, city.lon], {
+            radius: 10,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.8,
+          }).addTo(map);
+
+          // Bind the popup with the weather and AQI information
+          marker.bindPopup(`
+            <div class="popup-content">
+              <b>${city.name}</b><br>
+              <span class="weather-icon">${weatherIcon}</span> ${weatherDesc}<br>
+             <b>Temperature:</b> ${temperature}°C<br>
+             <b>AQI:</b>${category}<br>
+              <b>Precautions:</b> ${precautions}<br>
+              <b>Fix:</b> ${fix}<br>
+              <b>Last updated: ${timestamp}</b>
+            </div>
+          `);
+        } catch (error) {
+          console.error(`Error fetching data for ${city.name}:`, error);
+        }
+      }
+    }
+
+    fetchAQIData();
+        async function predictAQI() {
+            const formData = {
+                PM25: document.getElementById('pm25').value,
+                PM10: document.getElementById('pm10').value,
+                NO2: document.getElementById('no2').value,
+                SO2: document.getElementById('so2').value,
+                CO: document.getElementById('co').value,
+                O3: document.getElementById('o3').value,
+                Temperature: document.getElementById('temperature').value,
+                Humidity: document.getElementById('humidity').value,
+                WindSpeed: document.getElementById('windspeed').value
+            };
+
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+            document.getElementById('result').textContent = result.predicted_aqi;
+        }
+              document.getElementById("result").innerText = '${category}' - 'AQI:${aqi.toFixed(2)}';
+              document.getElementById("result").style.color = color;
+              
+                </script>
+</body>
+
+</html>
+
+
+
